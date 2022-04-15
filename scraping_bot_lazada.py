@@ -1,34 +1,36 @@
-from lib2to3.pgen2 import driver
-import string
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 # from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
-# from selenium.webdriver.common.by import By
+from selenium.webdriver.common.by import By
 # from selenium.webdriver.support.ui import WebDriverWait
 # from selenium.webdriver.support import expected_conditions as EC
-# import bs4
+import bs4
 import time
 import pandas as pd
 
 
 class Lazada_Scraper: 
-    def __init__(self): 
-        self.driver = webdriver.Chrome(executable_path=r'.\chromedriver\chromedriver.exe')
-        self.driver.get('https://www.lazada.co.th/')
-        self.category = [self.driver.find_element_by_id('Level_1_Category_No' + str(i)) for i in range(1, 13, 1)]
-        self.sub_category = [self.driver.find_element_by_xpath('/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i) + ']') for i in range(1, 13, 1)]
 
-    def get_category_info(self, url): 
+
+    def __init__(self): 
+        s = Service(r'.\chromedriver\chromedriver.exe')
+        self.driver = webdriver.Chrome(service=s)
+        self.driver.get('https://www.lazada.co.th/')
+        self.category = [self.driver.find_element(by=By.ID, value='Level_1_Category_No' + str(i)) for i in range(1, 13, 1)]
+        self.sub_category = [self.driver.find_element(by=By.XPATH, value='/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i) + ']') for i in range(1, 13, 1)]
+
+
+    def get_category_info(self): 
 
         sub_cat_list = {}
         grand_cat_list = {}
         
         for i, cat in enumerate(self.category):
-            # print(cat.text)
             cat.click()
             
-            time.sleep(2)
+            time.sleep(1)
             
             sub_cat_list[cat.text] = list(filter(None, self.sub_category[i].text.split('\n')))
 
@@ -36,7 +38,7 @@ class Lazada_Scraper:
                 SUB_PATH = '/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i+1) + ']/li[' + str(j+1) + ']'
                 GRAND_PATH = '/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i+1) + ']/li[' + str(j+1) + ']/ul'
 
-                hover = ActionChains(self.driver).move_to_element(self.driver.find_element_by_xpath(SUB_PATH))
+                hover = ActionChains(self.driver).move_to_element(self.driver.find_element(by=By.XPATH, value=SUB_PATH))
                 hover.perform()
 
                 time.sleep(1)
@@ -44,7 +46,7 @@ class Lazada_Scraper:
                 grand_category = []
 
                 try:
-                    grand_category.append(self.driver.find_element_by_xpath(GRAND_PATH))
+                    grand_category.append(self.driver.find_element(by=By.XPATH, value=GRAND_PATH))
                     grand_cat_list[sub_cat] = list(filter(None, grand_category[0].text.split('\n')))
                     # print(grand_cat_list[sub_cat])
                 except NoSuchElementException: 
@@ -88,7 +90,8 @@ class Lazada_Scraper:
         self.driver.quit()
         return category_table
 
-    def get_grand_category_metadata(self, url, keyword: string): 
+
+    def get_grand_category_metadata(self, keyword: str): 
 
         sub_cat_list = {}
         grand_cat_list = {}
@@ -96,7 +99,7 @@ class Lazada_Scraper:
         for i, cat in enumerate(self.category):
             cat.click()
             
-            time.sleep(2)
+            time.sleep(1)
 
             sub_cat_list[cat.text] = list(filter(None, self.sub_category[i].text.split('\n')))
 
@@ -104,16 +107,73 @@ class Lazada_Scraper:
                 SUB_PATH = '/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i+1) + ']/li[' + str(j+1) + ']'
                 GRAND_PATH = '/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i+1) + ']/li[' + str(j+1) + ']/ul'
 
-                hover_sub = ActionChains(self.driver).move_to_element(self.driver.find_element_by_xpath(SUB_PATH))
-                hover_sub.click(GRAND_PATH)
+                hover_sub = ActionChains(self.driver).move_to_element(self.driver.find_element(by=By.XPATH, value=SUB_PATH))
                 hover_sub.perform()
 
-                # time.sleep(1)
+                time.sleep(1)
 
-                # self.driver.implicitly_wait(5)
+                grand_category = []
+
+                try:
+                    grand_element = self.driver.find_element(by=By.XPATH, value=GRAND_PATH)
+
+                    grand_category.append(grand_element)
+                    grand_cat_list[sub_cat] = list(filter(None, grand_category[0].text.split('\n')))
+                    # print(grand_cat_list[sub_cat])
+                    for key in grand_cat_list[sub_cat]:
+                        # print(key)
+                        if key == keyword: 
+                            print('Keyword Matched: ', keyword)
+                            grand_click = self.driver.find_element(by=By.LINK_TEXT, value=key)
+                            grand_click.click()
+                            
+                            self.scraping_metadata(keyword=key)
+                            return
+                        else: 
+                            pass
+                except NoSuchElementException: 
+                    pass
+
+        print('The keyword does not matched in any category.')
 
 
-        
+    def scraping_metadata(self, keyword: str):
+        self.driver.execute_script("document.body.style.zoom='10%'")
+
+        data = self.driver.page_source
+        soup = bs4.BeautifulSoup(data, features="html.parser")
+
+        # Get product name from lazada
+        all_product = soup.find_all('div', {'class':'RfADt'})
+
+        all_product_list = []
+        for product in all_product:
+            all_product_list.append(product.text)
+        all_product_list
+
+        # Get price from lazada
+        all_price = soup.find_all('div', {'class':'aBrP0'})
+
+        all_price_list = []
+        for price in all_price: 
+            all_price_list.append(price.text)
+        all_price_list
+
+        # Merge all list into DataFrame
+        lazada_data = pd.DataFrame([all_product_list, all_price_list])
+
+        lazada_data = lazada_data.transpose()
+        lazada_data.columns = ['title', 'price']
+
+        # Save metadata into csv file
+        lazada_data.to_csv(r'.\lazada_metadata_{}.csv'.format(keyword), encoding='utf-8-sig')
+
+        print('scraping done!!')
+        self.driver.quit()
+
+        return lazada_data
+
+       
 # =============================================================================
 #         try:
 #             element = WebDriverWait(driver, 10).until(
@@ -126,5 +186,5 @@ class Lazada_Scraper:
 
 if __name__ == '__main__':
     bot = Lazada_Scraper()
-    category_data = bot.get_category_info('https://www.lazada.co.th/') # get category info from lazada
-    # bot.get_grand_category_metadata('https://www.lazada.co.th/', "Mobiles") # get results from each grand category
+    # category_data = bot.get_category_info('https://www.lazada.co.th/') # get category info from lazada
+    df = bot.get_grand_category_metadata(keyword="Tablet Cases & Covers") # get results from each grand category
