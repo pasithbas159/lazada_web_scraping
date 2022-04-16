@@ -93,7 +93,7 @@ class Lazada_Scraper:
         return category_table
 
 
-    def get_grand_category_metadata(self, keyword: str): 
+    def get_grand_category_metadata(self, keyword: str, num_pages: int): 
 
         sub_cat_list = {}
         grand_cat_list = {}
@@ -129,7 +129,7 @@ class Lazada_Scraper:
                             grand_click = self.driver.find_element(by=By.LINK_TEXT, value=key)
                             grand_click.click()
                             
-                            self.scraping_metadata(keyword=key)
+                            self.scraping_metadata(keyword=key, pages=num_pages)
                             return
                         else: 
                             pass
@@ -139,14 +139,14 @@ class Lazada_Scraper:
         print('The keyword does not matched in any category.')
 
 
-    def scraping_metadata(self, keyword: str):
+    def scraping_metadata(self, keyword: str, pages: int):
         NEXT_PATH = 'ant-pagination-next'
         count = 1
         all_product_list = []
         all_price_list = []
         number_of_pages = 102
 
-        while count <= 5:
+        while count <= pages:
             if count <= number_of_pages: 
                 print('Current Page:', str(count))
                 time.sleep(4)
@@ -214,4 +214,4 @@ class Lazada_Scraper:
 if __name__ == '__main__':
     bot = Lazada_Scraper()
     # category_data = bot.get_category_info('https://www.lazada.co.th/') # get category info from lazada
-    df = bot.get_grand_category_metadata(keyword="Mobiles") # get results from each grand category
+    df = bot.get_grand_category_metadata(keyword="Mobiles", num_pages=10) # get results from each grand category
