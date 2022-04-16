@@ -1,11 +1,13 @@
+from numpy import number
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import ElementClickInterceptedException
 # from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
-# from selenium.webdriver.support.ui import WebDriverWait
-# from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import bs4
 import time
 import pandas as pd
@@ -107,14 +109,14 @@ class Lazada_Scraper:
                 SUB_PATH = '/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i+1) + ']/li[' + str(j+1) + ']'
                 GRAND_PATH = '/html/body/div[2]/div/div[2]/div/div/div/div/div/div/div/ul/ul[' + str(i+1) + ']/li[' + str(j+1) + ']/ul'
 
-                hover_sub = ActionChains(self.driver).move_to_element(self.driver.find_element(by=By.XPATH, value=SUB_PATH))
-                hover_sub.perform()
-
                 time.sleep(1)
 
                 grand_category = []
 
                 try:
+                    hover_sub = ActionChains(self.driver).move_to_element(self.driver.find_element(by=By.XPATH, value=SUB_PATH))
+                    hover_sub.perform()
+
                     grand_element = self.driver.find_element(by=By.XPATH, value=GRAND_PATH)
 
                     grand_category.append(grand_element)
@@ -138,26 +140,51 @@ class Lazada_Scraper:
 
 
     def scraping_metadata(self, keyword: str):
-        self.driver.execute_script("document.body.style.zoom='10%'")
-
-        data = self.driver.page_source
-        soup = bs4.BeautifulSoup(data, features="html.parser")
-
-        # Get product name from lazada
-        all_product = soup.find_all('div', {'class':'RfADt'})
-
+        NEXT_PATH = 'ant-pagination-next'
+        count = 1
         all_product_list = []
-        for product in all_product:
-            all_product_list.append(product.text)
-        all_product_list
-
-        # Get price from lazada
-        all_price = soup.find_all('div', {'class':'aBrP0'})
-
         all_price_list = []
-        for price in all_price: 
-            all_price_list.append(price.text)
-        all_price_list
+        number_of_pages = 102
+
+        while count <= 5:
+            if count <= number_of_pages: 
+                print('Current Page:', str(count))
+                time.sleep(4)
+                self.driver.implicitly_wait(10)
+                self.driver.execute_script("document.body.style.zoom='10%'")
+
+                data = self.driver.page_source
+                soup = bs4.BeautifulSoup(data, features="html.parser")
+
+                self.driver.execute_script("document.body.style.zoom='100%'")
+                # time.sleep(5)
+
+                try: 
+                    WebDriverWait(self.driver, 20).until(EC.element_to_be_clickable((By.CLASS_NAME, NEXT_PATH))).click()
+                except ElementClickInterceptedException: 
+                    print('except')
+                    next_page = ActionChains(self.driver).move_to_element(self.driver.find_element(by=By.CLASS_NAME, value=NEXT_PATH))
+                    next_page.click().perform()
+                    # time.sleep(5)
+
+                # Get product name from lazada
+                all_product = soup.find_all('div', {'class':'RfADt'})
+
+                for product in all_product:
+                    all_product_list.append(product.text)
+
+                # Get price from lazada
+                all_price = soup.find_all('div', {'class':'aBrP0'})
+
+                for price in all_price: 
+                    all_price_list.append(price.text)
+
+                print('The data is collected')
+                count += 1
+
+            else: 
+                print('Scraping done!!!')
+                # print('Page:', str(count))
 
         # Merge all list into DataFrame
         lazada_data = pd.DataFrame([all_product_list, all_price_list])
@@ -168,7 +195,7 @@ class Lazada_Scraper:
         # Save metadata into csv file
         lazada_data.to_csv(r'.\lazada_metadata_{}.csv'.format(keyword), encoding='utf-8-sig')
 
-        print('scraping done!!')
+        print('The data is saved!!')
         self.driver.quit()
 
         return lazada_data
@@ -187,4 +214,4 @@ class Lazada_Scraper:
 if __name__ == '__main__':
     bot = Lazada_Scraper()
     # category_data = bot.get_category_info('https://www.lazada.co.th/') # get category info from lazada
-    df = bot.get_grand_category_metadata(keyword="Tablet Cases & Covers") # get results from each grand category
+    df = bot.get_grand_category_metadata(keyword="Mobiles") # get results from each grand category
