@@ -185,7 +185,6 @@ class Lazada_Scraper:
                     print('except')
                     next_page = ActionChains(self.driver).move_to_element(self.driver.find_element(by=By.CLASS_NAME, value=NEXT_PATH))
                     next_page.click().perform()
-                    # time.sleep(5)
 
                 # Get product name from lazada
                 all_product = soup.find_all('div', {'class':'RfADt'})
@@ -225,7 +224,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--keyword", type=str, help='Category keyword')
     parser.add_argument("--num_pages", type=int, help='number of pages (1-102)')
-    parser.add_argument("--op", type=int, help='1 : Category Info, 2 : Category Scraping')
+    parser.add_argument("--op", type=int, help='1 : Category Info, 2 : Category Scraping, 3 : Keyword Scraping')
     config = parser.parse_args()
 
     bot = Lazada_Scraper()
