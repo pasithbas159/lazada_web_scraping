@@ -1,0 +1,3 @@
+python scraping_bot_lazada.py --op 2 --keyword Mobiles --num_pages 5
+
+python scraping_bot_lazada.py --op 3 --keyword "bass guitar" --num_pages 5

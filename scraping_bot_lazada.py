@@ -1,22 +1,22 @@
-from numpy import number
+import bs4
+import time
+import pandas as pd
+import argparse
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import ElementClickInterceptedException
-# from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import bs4
-import time
-import pandas as pd
-
 
 class Lazada_Scraper: 
 
 
     def __init__(self): 
+
         s = Service(r'.\chromedriver\chromedriver.exe')
         self.driver = webdriver.Chrome(service=s)
         self.driver.get('https://www.lazada.co.th/')
@@ -129,7 +129,7 @@ class Lazada_Scraper:
                             grand_click = self.driver.find_element(by=By.LINK_TEXT, value=key)
                             grand_click.click()
                             
-                            self.scraping_metadata(keyword=key, pages=num_pages)
+                            self.write_product_to_csv(keyword=key, pages=num_pages)
                             return
                         else: 
                             pass
@@ -139,7 +139,27 @@ class Lazada_Scraper:
         print('The keyword does not matched in any category.')
 
 
-    def scraping_metadata(self, keyword: str, pages: int):
+    def write_product_to_csv(self, keyword: str, pages: int):
+
+        all_product_list, all_price_list = self.scraping_metadata(pages)
+
+        # Merge all list into DataFrame
+        lazada_data = pd.DataFrame([all_product_list, all_price_list])
+
+        lazada_data = lazada_data.transpose()
+        lazada_data.columns = ['title', 'price']
+
+        # Save metadata into csv file
+        lazada_data.to_csv(r'.\lazada_metadata_{}.csv'.format(keyword), encoding='utf-8-sig')
+
+        print('The data is saved!!')
+        self.driver.quit()
+
+        return lazada_data
+
+
+    def scraping_metadata(self, pages: int):
+
         NEXT_PATH = 'ant-pagination-next'
         count = 1
         all_product_list = []
@@ -149,7 +169,7 @@ class Lazada_Scraper:
         while count <= pages:
             if count <= number_of_pages: 
                 print('Current Page:', str(count))
-                time.sleep(4)
+                time.sleep(3)
                 self.driver.implicitly_wait(10)
                 self.driver.execute_script("document.body.style.zoom='10%'")
 
@@ -179,39 +199,41 @@ class Lazada_Scraper:
                 for price in all_price: 
                     all_price_list.append(price.text)
 
-                print('The data is collected')
+                print('The data is collected.')
                 count += 1
 
             else: 
                 print('Scraping done!!!')
                 # print('Page:', str(count))
 
-        # Merge all list into DataFrame
-        lazada_data = pd.DataFrame([all_product_list, all_price_list])
+        return all_product_list, all_price_list 
 
-        lazada_data = lazada_data.transpose()
-        lazada_data.columns = ['title', 'price']
 
-        # Save metadata into csv file
-        lazada_data.to_csv(r'.\lazada_metadata_{}.csv'.format(keyword), encoding='utf-8-sig')
+    def get_keyword_metadata(self, keyword: str, num_pages: int):
 
-        print('The data is saved!!')
-        self.driver.quit()
+        print(f'Scraping by Keyword: "{keyword}"')
+        search = self.driver.find_element(by=By.CLASS_NAME, value='search-box__input--O34g')
+        search.send_keys(keyword)
+        search.send_keys(Keys.ENTER)
+        data = self.write_product_to_csv(keyword, num_pages)
 
-        return lazada_data
+        return data
 
-       
-# =============================================================================
-#         try:
-#             element = WebDriverWait(driver, 10).until(
-#                 EC.presence_of_element_located((By.ID, "myDynamicElement"))
-#             )
-#         finally:
-#             driver.quit()
-# =============================================================================
-        
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--keyword", type=str, help='Category keyword')
+    parser.add_argument("--num_pages", type=int, help='number of pages (1-102)')
+    parser.add_argument("--op", type=int, help='1 : Category Info, 2 : Category Scraping')
+    config = parser.parse_args()
+
     bot = Lazada_Scraper()
-    # category_data = bot.get_category_info('https://www.lazada.co.th/') # get category info from lazada
-    df = bot.get_grand_category_metadata(keyword="Mobiles", num_pages=10) # get results from each grand category
+    if config.op == 1: 
+        category_data = bot.get_category_info() # get category info from lazada
+    elif config.op == 2: 
+        data = bot.get_grand_category_metadata(keyword=config.keyword, num_pages=config.num_pages) # get results from each grand category (category, number of pages).
+    elif config.op == 3: 
+        data = bot.get_keyword_metadata(keyword=config.keyword, num_pages=config.num_pages) # get results that related to the keywords.
+    else: 
+        print('There is no such option.')
